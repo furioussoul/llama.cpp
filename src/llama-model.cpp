@@ -3552,7 +3552,7 @@ size_t llama_model::size() const {
 }
 
 size_t llama_model::max_nodes() const {
-    return std::max<size_t>(8192, tensors_by_name.size()*5);
+    return std::max<size_t>(8192, tensors_by_name.size()*5);//改成*1也没影响，为什么？
 }
 
 size_t llama_model::n_devices() const {

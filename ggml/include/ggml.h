@@ -243,7 +243,7 @@
 
 #define GGML_UNUSED(x) (void)(x)
 
-#define GGML_PAD(x, n) (((x) + (n) - 1) & ~((n) - 1))
+#define GGML_PAD(x, n) (((x) + (n) - 1) & ~((n) - 1)) // pad x to the next multiple of n
 
 #ifndef NDEBUG
 #   define GGML_UNREACHABLE() do { fprintf(stderr, "statement should be unreachable\n"); abort(); } while(0)

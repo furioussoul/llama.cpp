@@ -8355,13 +8355,13 @@ static void ggml_compute_forward_transpose(
 }
 
 // ggml_compute_forward_get_rows
-// 用于从一个源张量 (src0) 中提取行，并将其解量化后存储到目标张量 (dst) 中。src0 和 src1：src0 是源张量，包含量化数据；src1 是索引张量，指定从 src0 中提取哪些行。
+// 用于从源张量 (src0) 中提取行，并将其解量化后存储到目标张量 (dst) 中。src0 和 src1：src0 是源张量，包含量化数据；src1 是索引张量，指定从 src0 中提取哪些行。
 static void ggml_compute_forward_get_rows_q(
         const struct ggml_compute_params * params,
         /*input.embd [3584,1,1,1]*/struct ggml_tensor * dst) {
 
     const struct ggml_tensor * src0 = dst->src[0]; // token.embd.weight [3584,152064,1,1]
-    const struct ggml_tensor * src1 = dst->src[1]; // input.tokens [1,1,1,1]
+    const struct ggml_tensor * src1 = dst->src[1]; // [1,1,1,1] 索引张量，表示取第一行
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
@@ -8387,13 +8387,16 @@ static void ggml_compute_forward_get_rows_q(
     const int ir1 = MIN(ir0 + dr, nr);  // 当前线程处理的结束行
     //i12：第 0 维索引，表示当前行属于哪个块。i11：第 1 维索引，表示当前行在块中的哪一行。i10：第 2 维索引，表示当前行在行内的列索引。
     for (int64_t i = ir0; i < ir1; ++i) { // 线程1处理[2,3]行
-        const int64_t i12 = i/(ne11*ne10);//计算 i12（block）：ne11 * ne10 是第 0 维的步长，即每个块中元素的总数。i / (ne11 * ne10) 表示当前行属于第几个块。
-        const int64_t i11 = (i - i12*ne11*ne10)/ne10; //计算 i11（row）：i - i12 * ne11 * ne10 是去掉第 0 维的偏移量后剩下的线性索引。再除以 ne10，表示当前行在块中的第几行。
-        const int64_t i10 = (i - i12*ne11*ne10 - i11*ne10);//计算 i10（col）：i - i12 * ne11 * ne10 - i11 * ne10 是去掉第 0 维和第 1 维的偏移量后剩下的线性索引。这个值就是当前行在行内的列索引。
-        const int64_t i01 = *(int32_t *) ((char *) src1->data + i10*nb10 + i11*nb11 + i12*nb12); // 提取src0的行号
+        // 先计算当前线程处理的行所在src1的块的下标，行的下标，列的下标
+        const int64_t i12 = i/(ne11*ne10); //计算线程所处理行i在src1的（block）下标，每个块包含元素的总数为ne11 * ne10，所以i / (ne11 * ne10) 表示当前行属于第几个块。
+        const int64_t i11 = (i - i12*ne11*ne10)/ne10; //计算线程所处理行i所在（row）下标。
+        const int64_t i10 = (i - i12*ne11*ne10 - i11*ne10); //计算线程所处理行i所在（col）下标。
+        // 再计算该块i12，行i11，列i10位置src1元素的地址，根据该地址取出的值作为src0的行号
+        const int64_t i01 = *(int32_t *) ((char *) src1->data + i10*nb10 + i11*nb11 + i12*nb12); 
 
         GGML_ASSERT(i01 >= 0 && i01 < ne01); // 行号>=0 && < src0的行数
-        // dst [3584,1,1,1]
+        // dst.shape=[3584,1,1,1]，nc=3584
+        // 通过行开始地址，把src0行数据量化后拷贝到src1中，nc代表列数（拷贝多少数据）
         dequantize_row_q(
                 (const void *) ((char *) src0->data + i01*nb01 + i11*nb02 + i12*nb03),
                      (float *) ((char *)  dst->data + i10*nb1  + i11*nb2  + i12*nb3), nc);

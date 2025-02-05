@@ -1,6 +1,5 @@
 #include <console.h>
 #include "llama.h"
-#include <llama-model.h>
 #include <log.h>
 #include <sampling.h>
 

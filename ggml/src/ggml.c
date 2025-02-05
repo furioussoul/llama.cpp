@@ -5729,13 +5729,13 @@ static void ggml_compute_backward(
     GGML_ASSERT(!src1_needs_grads || ggml_are_same_shape(src1, cgraph->grads[isrc1]));
     GGML_ASSERT(!src2_needs_grads || ggml_are_same_shape(src2, cgraph->grads[isrc2]));
 }
-
+// 递归
 static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor * node) {
     // check if already visited
     if (ggml_hash_insert(&cgraph->visited_hash_set, node) == GGML_HASHSET_ALREADY_EXISTS) {
         return;
     }
-
+    // 从左到右深度优先递归遍历这个图(cgraph->order == GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT)
     for (int i = 0; i < GGML_MAX_SRC; ++i) {
         const int k =
             (cgraph->order == GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT) ? i :
@@ -5745,7 +5745,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
             ggml_visit_parents(cgraph, node->src[k]);
         }
     }
-
+    // 当前node没有父节点了，并且没有op，也没有训练参数，说明是个叶子节点
     if (node->op == GGML_OP_NONE && !(node->flags & GGML_TENSOR_FLAG_PARAM)) {
         // reached a leaf node, not part of the gradient graph (e.g. a constant)
         GGML_ASSERT(cgraph->n_leafs < cgraph->size);
@@ -5753,7 +5753,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         if (strlen(node->name) == 0) {
             ggml_format_name(node, "leaf_%d", cgraph->n_leafs);
         }
-
+        // 将叶子节点存入leafs
         cgraph->leafs[cgraph->n_leafs] = node;
         cgraph->n_leafs++;
     } else {
@@ -5762,19 +5762,19 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
         if (strlen(node->name) == 0) {
             ggml_format_name(node, "node_%d", cgraph->n_nodes);
         }
-
+        // 否则存入nodes
         cgraph->nodes[cgraph->n_nodes] = node;
         cgraph->n_nodes++;
     }
 }
-
+// 找到tensor的父节点，若父节点是leaf就加入cgraph->leafs，否则加入cgraph->nodes
 static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
     if (!expand) {
         // TODO: this branch isn't accessible anymore, maybe move this to ggml_build_forward_expand
         ggml_graph_clear(cgraph);
     }
 
-    const int n0 = cgraph->n_nodes;
+    const int n0 = cgraph->n_nodes; // umber of nodes currently in use
 
     ggml_visit_parents(cgraph, tensor);
 
@@ -5783,7 +5783,7 @@ static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_ten
 
     if (n_new > 0) {
         // the last added node should always be starting point
-        GGML_ASSERT(cgraph->nodes[cgraph->n_nodes - 1] == tensor);
+        GGML_ASSERT(cgraph->nodes[cgraph->n_nodes - 1] == tensor);// 为什么等于？因为ggml_visit_parents深度优先递归导致的。所以tensor必须是node
     }
 }
 

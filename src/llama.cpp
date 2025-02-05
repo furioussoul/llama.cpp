@@ -113,12 +113,12 @@ static struct ggml_tensor * llm_build_inp_embd(
          const llama_ubatch & ubatch,
          struct ggml_tensor * tok_embd,
          const llm_build_cb & cb) {
-    const int64_t n_embd = hparams.n_embd;
+    const int64_t n_embd = hparams.n_embd; // 3584
 
     struct ggml_tensor * inpL;
 
     if (ubatch.token) {
-        lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, ubatch.n_tokens);
+        lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, ubatch.n_tokens); // [1,1,1,1]
         cb(lctx.inp_tokens, "inp_tokens", -1);
         ggml_set_input(lctx.inp_tokens);
 
@@ -562,7 +562,7 @@ static struct ggml_tensor * llm_build_kqv(
     const int64_t n_embd_k_gqa  = hparams.n_embd_k_gqa(il);
     const int64_t n_embd_head_v = hparams.n_embd_head_v;
     const int64_t n_embd_v_gqa  = hparams.n_embd_v_gqa(il);
-
+    // 复制一个tensor，但底层用的还是原来的内存，q_cur.data == q.view_src.data
     struct ggml_tensor * q = ggml_permute(ctx, q_cur, 0, 2, 1, 3);
     cb(q, "q", il);
 
@@ -666,18 +666,18 @@ static struct ggml_tensor * llm_build_kv(
        struct llama_context & lctx,
        const llama_kv_cache & kv,
          struct ggml_cgraph * graph,
-         struct ggml_tensor * wo,
-         struct ggml_tensor * wo_b,
-         struct ggml_tensor * k_cur,
-         struct ggml_tensor * v_cur,
+         struct ggml_tensor * wo, //输出投影的权重矩阵（W_o）
+         struct ggml_tensor * wo_b, //输出投影的偏置项（b_o）
+         struct ggml_tensor * k_cur, // 当前的 Query 张量。
+         struct ggml_tensor * v_cur, 
          struct ggml_tensor * q_cur,
-         struct ggml_tensor * kq_mask,
+         struct ggml_tensor * kq_mask, // 注意力的屏蔽矩阵，用于实现因果性或其他限制。
                     int32_t   n_tokens,
-                    int32_t   kv_head,
-                    int32_t   n_kv,
-                    float     kq_scale,
+                    int32_t   kv_head, // 头数量 qwen2.5-7B =4
+                    int32_t   n_kv, // Key 和 Value 的数量（通常等于上下文窗口大小）。具体为什么忘了
+                    float     kq_scale, // 缩放因子，用于缩放 Query-Key 的点积。
          const llm_build_cb & cb,
-                    int       il) {
+                    int       il) { // 当前层的索引（i-th layer）。
     const llama_hparams & hparams = lctx.model.hparams;
     const llama_cparams & cparams = lctx.cparams;
 
@@ -1313,10 +1313,10 @@ struct llm_build_context {
 
     struct ggml_tensor * build_inp_KQ_mask(bool causal = true) {
         lctx.inp_KQ_mask = causal
-            ? ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_kv,     GGML_PAD(n_tokens, GGML_KQ_MASK_PAD))
+            ? ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_kv,     GGML_PAD(n_tokens, GGML_KQ_MASK_PAD)) // [4096, 512]
             : ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_tokens, GGML_PAD(n_tokens, GGML_KQ_MASK_PAD));
         cb(lctx.inp_KQ_mask, "KQ_mask", -1);
-        ggml_set_input(lctx.inp_KQ_mask);
+        ggml_set_input(lctx.inp_KQ_mask); // mark as input tensor
 
         return flash_attn ? ggml_cast(ctx0, lctx.inp_KQ_mask, GGML_TYPE_F16) : lctx.inp_KQ_mask;
     }
@@ -8231,7 +8231,7 @@ static struct ggml_cgraph * llama_build_graph(
             } break;
         case LLM_ARCH_QWEN2:
             {
-                result = llm.build_qwen2();
+                result = llm.build_qwen2(); // result is cgraph
             } break;
         case LLM_ARCH_QWEN2VL:
             {
@@ -8573,7 +8573,7 @@ static int llama_decode_impl(
            llama_batch   inp_batch) {
 
     lctx.is_encoding = false;
-
+    // prefill 阶段 32 token, decode阶段 1 token
     if (inp_batch.n_tokens == 0) {
         LLAMA_LOG_ERROR("%s: n_tokens == 0\n", __func__);
         return -1;
@@ -8599,14 +8599,14 @@ static int llama_decode_impl(
 
     uint32_t n_outputs = 0;
     uint32_t n_outputs_prev = 0;
-
+    
     {
         const int ret = llama_prepare_sbatch(lctx, batch, n_outputs);
         if (ret != 0) {
             return ret;
         }
     }
-
+    // 把sbatch（逻辑）拆成ubatch（物理）
     while (lctx.sbatch.n_tokens > 0) {
         llama_ubatch ubatch;
         {
@@ -8622,7 +8622,7 @@ static int llama_decode_impl(
         GGML_ASSERT(n_threads > 0);
 
         //printf("kv_self.n = %5d, kv_self.used = %5d, kv_self.head = %5d\n", kv_self.n, kv_self.used, kv_self.head);
-
+        // 设置默认值
         ggml_backend_sched_reset(lctx.sched.get());
         ggml_backend_sched_set_eval_callback(lctx.sched.get(), lctx.cparams.cb_eval, lctx.cparams.cb_eval_user_data);
 
@@ -8680,11 +8680,13 @@ static int llama_decode_impl(
                 kv_self.head = 0;
             }
         }
-
-        // plot the computation graph in dot format (for debugging purposes)
-        //if (n_past%100 == 0) {
+        // int n_past = 0;
+        // // plot the computation graph in dot format (for debugging purposes)
+        // if (n_past%100 == 0) {
         //    ggml_graph_dump_dot(gf, NULL, "llama.dot");
-        //}
+        // }
+
+        // ggml_graph_print(gf);
 
         // extract logits
         if (res) {

@@ -522,13 +522,13 @@ size_t llama_output_reserve(struct llama_context & lctx, size_t n_outputs) {
 
     float * output_base = (float *) ggml_backend_buffer_get_base(lctx.buf_output.get());
 
-    lctx.logits = has_logits ? output_base               : nullptr;
+    lctx.logits = has_logits ? output_base               : nullptr; // logits, embd
     lctx.embd   = has_embd   ? output_base + logits_size : nullptr;
 
-    lctx.output_size = n_outputs_max;
-    lctx.logits_size = logits_size;
-    lctx.embd_size   = embd_size;
-
+    lctx.output_size = n_outputs_max; // 1 token
+    lctx.logits_size = logits_size; // 152064
+    lctx.embd_size   = embd_size; // 0 为什么是0？
+    // 以下是lctx的重置操作？
     // set all ids as invalid (negative)
     std::fill(lctx.output_ids.begin(), lctx.output_ids.end(), -1);
 
