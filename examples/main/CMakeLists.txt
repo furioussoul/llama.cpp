@@ -1,0 +1,11 @@
+set(TARGET llama-cli)
+set(TARGET2 blade-llm)
+add_executable(${TARGET} main.cpp)
+install(TARGETS ${TARGET} RUNTIME)
+target_link_libraries(${TARGET} PRIVATE common llama ${CMAKE_THREAD_LIBS_INIT})
+target_compile_features(${TARGET} PRIVATE cxx_std_17)
+
+add_executable(${TARGET2} blade-llm.cpp)
+install(TARGETS ${TARGET2} RUNTIME)
+target_link_libraries(${TARGET2} PRIVATE common llama ${CMAKE_THREAD_LIBS_INIT})
+target_compile_features(${TARGET2} PRIVATE cxx_std_17)

@@ -1,0 +1,130 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python 调试程序: 当前文件",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "CUDA-GDB Debug",
+      "type": "cuda-gdb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/${fileBasenameNoExtension}",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "debuggerPath": "/usr/local/cuda/bin/cuda-gdb"
+    },
+    {
+      "name": "(gdb) 启动",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/${fileBasenameNoExtension}",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "将反汇编风格设置为 Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "blade-llm",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/mnt/szj/llama.cpp/out/build/linux/bin/blade-llm",
+      "args": [
+        "--n_gpu_layers",
+        "29",
+        "-m",
+        "/mnt/szj/llama.cpp/models/qwen2.5-7b-it-Q4_K_M-LOT.gguf"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "CUDA_VISIBLE_DEVICES",
+          "value": "3"
+        }
+      ],
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "将反汇编风格设置为 Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "qwen2.5-7b",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/mnt/szj/llama.cpp/out/build/linux/bin/llama-cli",
+      "args": [
+        "--n_gpu_layers",
+        "29",
+        "-m",
+        "/mnt/szj/llama.cpp/models/qwen2.5-7b-it-Q4_K_M-LOT.gguf"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "CUDA_VISIBLE_DEVICES",
+          "value": "3"
+        }
+      ],
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "将反汇编风格设置为 Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "qwen2.5-7b-cuda",
+      "type": "cuda-gdb",
+      "request": "launch",
+      "program": "/mnt/szj/llama.cpp/out/build/linux/bin/llama-cli",
+      "args": [
+        "--n_gpu_layers 29 -m /mnt/szj/llama.cpp/models/qwen2.5-7b-it-Q4_K_M-LOT.gguf",
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "CUDA_VISIBLE_DEVICES",
+          "value": "3"
+        }
+      ],
+      "debuggerPath": "/usr/local/cuda/bin/cuda-gdb"
+    }
+  ]
+}
