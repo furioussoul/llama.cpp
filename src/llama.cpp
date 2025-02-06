@@ -121,7 +121,7 @@ static struct ggml_tensor * llm_build_inp_embd(
         lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, ubatch.n_tokens); // [32,1,1,1]
         cb(lctx.inp_tokens, "inp_tokens", -1);
         ggml_set_input(lctx.inp_tokens);
-
+        // 根据token id 去 tok_embd 中获取对应的embedding
         inpL = ggml_get_rows(ctx, tok_embd, lctx.inp_tokens);
 
         // apply lora for embedding tokens if needed
@@ -9677,10 +9677,10 @@ struct llama_context * llama_init_from_model(
         type_v = GGML_TYPE_F32; // required by ggml_ssm_scan for Mamba's ssm_states
     }
 
-    GGML_ASSERT(hparams.n_embd_head_k % ggml_blck_size(type_k) == 0);
+    GGML_ASSERT(hparams.n_embd_head_k % ggml_blck_size(type_k) == 0); // 什么情况 ggml_blck_size(type_k) != 0 ?
     GGML_ASSERT(hparams.n_embd_head_v % ggml_blck_size(type_v) == 0);
-
-    if (!hparams.vocab_only) {
+    
+    if (!hparams.vocab_only) {// only load the vocabulary, no weights
         // GPU backends
         for (auto * dev : model->devices) {
             ggml_backend_t backend = ggml_backend_dev_init(dev, nullptr);

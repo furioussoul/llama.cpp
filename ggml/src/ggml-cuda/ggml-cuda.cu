@@ -3394,7 +3394,7 @@ static const ggml_backend_reg_i ggml_backend_cuda_reg_interface = {
     /* .get_proc_address  = */ ggml_backend_cuda_reg_get_proc_address,
 };
 
-// backend registry
+// backend registry，这段代码会在单线程中执行，并顺序地切换当前线程绑定的 GPU 设备。不会有多个线程执行，除非你显式创建多个线程。
 ggml_backend_reg_t ggml_backend_cuda_reg() {
     static ggml_backend_reg reg;
     static bool initialized = false;
@@ -3404,7 +3404,7 @@ ggml_backend_reg_t ggml_backend_cuda_reg() {
         std::lock_guard<std::mutex> lock(mutex);
         if (!initialized) {
             ggml_backend_cuda_reg_context * ctx = new ggml_backend_cuda_reg_context;
-
+            // 循环，切换gpu，获取各gpu信息并创建backend_dev对象，存入ctx
             for (int i = 0; i < ggml_cuda_info().device_count; i++) {
                 ggml_backend_cuda_device_context * dev_ctx = new ggml_backend_cuda_device_context;
                 dev_ctx->device = i;

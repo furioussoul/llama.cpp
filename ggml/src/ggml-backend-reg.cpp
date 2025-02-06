@@ -227,7 +227,7 @@ struct ggml_backend_registry {
         }
 
         auto score_fn = (ggml_backend_score_t) dl_get_sym(handle.get(), "ggml_backend_score");
-        if (score_fn && score_fn() == 0) {
+        if (!score_fn || score_fn() == 0) {
             if (!silent) {
                 GGML_LOG_INFO("%s: backend %s is not supported on this system\n", __func__, utf16_to_utf8(path).c_str());
             }

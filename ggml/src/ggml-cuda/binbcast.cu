@@ -37,8 +37,8 @@ static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst
     if (i0s >= ne0 || i1 >= ne1 || i2 >= ne2 || i3 >= ne3) {
         return;
     }
-
-    const int i11 = i1 % ne11;
+    // 线程id转张量id
+    const int i11 = i1 % ne11; // 通过取模操作实现广播计算
     const int i12 = i2 % ne12;
     const int i13 = i3 % ne13;
 
@@ -49,9 +49,9 @@ static __global__ void k_bin_bcast(const src0_t * src0, const src1_t * src1, dst
     const src0_t * src0_row = src0 + i_src0;
     const src1_t * src1_row = src1 + i_src1;
     dst_t * dst_row = dst + i_dst;
-
-    for (int i0 = i0s; i0 < ne0; i0 += blockDim.x*gridDim.x) {
-        const int i10 = i0 % ne10;
+    // 以上计算都是一个grid内的线程共享的，下面是跨grid的计算，逻辑是一样的，所以for循环遍历grid。
+    for (int i0 = i0s; i0 < ne0; i0 += blockDim.x*gridDim.x) { 
+        const int i10 = i0 % ne10; // 通过取模操作实现广播计算
         dst_row[i0] = (dst_t)bin_op(src0 ? (float)src0_row[i0] : 0.0f, (float)src1_row[i10]);
     }
 }
@@ -126,7 +126,9 @@ struct bin_bcast_cuda {
     void operator()(const struct ggml_tensor * src0, const struct ggml_tensor * src1, struct ggml_tensor * dst,
             const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
             cudaStream_t stream) {
-
+        // src0.shape = [3584,2,1,1]
+        // src1.shape = [3584,1,1,1]
+        // dst.shape = [3584,2,1,1]
         GGML_TENSOR_BINARY_OP_LOCALS // 宏展开，设置维度和步长
 
         int nr0 = ne10/ne0;
@@ -134,7 +136,7 @@ struct bin_bcast_cuda {
         int nr2 = ne12/ne2;
         int nr3 = ne13/ne3;
 
-        int nr[4] = { nr0, nr1, nr2, nr3 }; // 0需要广播，1不需要广播
+        int nr[4] = { nr0, nr1, nr2, nr3 };
 
         // collapse dimensions until first broadcast dimension
         int64_t cne[] = {ne0, ne1, ne2, ne3};
@@ -160,10 +162,10 @@ struct bin_bcast_cuda {
 
         if (ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && ggml_is_contiguous(dst)) {
             for (int i = 0; i < 4; i++) {
-                if (nr[i] != 1) {
+                if (nr[i] != 1) { 
                     break;
                 }
-                if (i > 0) {
+                if (i > 0) { // 第0维不用折叠。src0维度大的时候，第1维开始可以折叠？
                     collapse_nb(cnb, cne);
                     collapse_nb(cnb0, cne0);
                     collapse_nb(cnb1, cne1);
@@ -205,7 +207,7 @@ struct bin_bcast_cuda {
             size_t nb12 = cnb1[2];
             size_t nb13 = cnb1[3];
 
-            size_t s0 = nb0 / sizeof(dst_t);
+            size_t s0 = nb0 / sizeof(dst_t); // 步长/元素大小
             size_t s1 = nb1 / sizeof(dst_t);
             size_t s2 = nb2 / sizeof(dst_t);
             size_t s3 = nb3 / sizeof(dst_t);
@@ -243,15 +245,14 @@ struct bin_bcast_cuda {
 
             int64_t hne0 = std::max(ne0/2LL, 1LL); // 一个线程处理两个元素，不除2应该也行。
             // 以下代码限制了一个block的线程数就是=128
-            dim3 block_dims;
+            dim3 block_dims; // [128,1,1]
             block_dims.x = std::min<unsigned int>(hne0, block_size);
             block_dims.y = std::min<unsigned int>(ne1, block_size / block_dims.x);
             block_dims.z = std::min(std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y), 64U);
-            // 固定了block_dims形状后后计算真实张量所需的形状block_nums，折叠了2，3维。
-            dim3 block_nums(
+            dim3 block_nums( // [28,1,1]
                 (hne0 + block_dims.x - 1) / block_dims.x,
                 (ne1 + block_dims.y - 1) / block_dims.y,
-                (ne2*ne3 + block_dims.z - 1) / block_dims.z
+                (ne2*ne3 + block_dims.z - 1) / block_dims.z  // 折叠2，3维度
             );
 
             if (block_nums.z > 65535) {
@@ -267,11 +268,11 @@ struct bin_bcast_cuda {
             } else {
                 k_bin_bcast<bin_op><<<block_nums, block_dims, 0, stream>>>(
                     src0_dd, src1_dd, dst_dd,
-                    ne0, ne1, ne2, ne3,
-                    ne10, ne11, ne12, ne13,
-                    /* s0, */ s1, s2, s3,
-                    /* s00, */ s01, s02, s03,
-                    /* s10, */ s11, s12, s13);
+                    ne0, ne1, ne2, ne3, // [3584,2,1,1]
+                    ne10, ne11, ne12, ne13, // [3584,1,1,1]
+                    /* s0, */ s1, s2, s3, // 1,  3584,7168,7168
+                    /* s00, */ s01, s02, s03, // 1,  3584,7168,7168
+                    /* s10, */ s11, s12, s13); // 1,  3584,3584,3584
             }
         }
     }

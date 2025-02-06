@@ -7,7 +7,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -ggdb")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 set(GGML_CUDA ON)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -g -G")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -g -G -lineinfo")
 set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -G -g -lineinfo")
 
 
