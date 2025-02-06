@@ -127,14 +127,14 @@ struct bin_bcast_cuda {
             const src0_t * src0_dd, const src1_t * src1_dd, dst_t * dst_dd,
             cudaStream_t stream) {
 
-        GGML_TENSOR_BINARY_OP_LOCALS
+        GGML_TENSOR_BINARY_OP_LOCALS // 宏展开，设置维度和步长
 
         int nr0 = ne10/ne0;
         int nr1 = ne11/ne1;
         int nr2 = ne12/ne2;
         int nr3 = ne13/ne3;
 
-        int nr[4] = { nr0, nr1, nr2, nr3 };
+        int nr[4] = { nr0, nr1, nr2, nr3 }; // 0需要广播，1不需要广播
 
         // collapse dimensions until first broadcast dimension
         int64_t cne[] = {ne0, ne1, ne2, ne3};
@@ -239,15 +239,15 @@ struct bin_bcast_cuda {
             GGML_ASSERT(s00 == 1);
             GGML_ASSERT(s10 == 1);
 
-            const int block_size = 128;
+            const int block_size = 128; // 一个block包含的线程数。
 
-            int64_t hne0 = std::max(ne0/2LL, 1LL);
-
+            int64_t hne0 = std::max(ne0/2LL, 1LL); // 一个线程处理两个元素，不除2应该也行。
+            // 以下代码限制了一个block的线程数就是=128
             dim3 block_dims;
             block_dims.x = std::min<unsigned int>(hne0, block_size);
             block_dims.y = std::min<unsigned int>(ne1, block_size / block_dims.x);
             block_dims.z = std::min(std::min<unsigned int>(ne2*ne3, block_size / block_dims.x / block_dims.y), 64U);
-
+            // 固定了block_dims形状后后计算真实张量所需的形状block_nums，折叠了2，3维。
             dim3 block_nums(
                 (hne0 + block_dims.x - 1) / block_dims.x,
                 (ne1 + block_dims.y - 1) / block_dims.y,

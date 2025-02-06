@@ -118,7 +118,7 @@ static struct ggml_tensor * llm_build_inp_embd(
     struct ggml_tensor * inpL;
 
     if (ubatch.token) {
-        lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, ubatch.n_tokens); // [1,1,1,1]
+        lctx.inp_tokens = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, ubatch.n_tokens); // [32,1,1,1]
         cb(lctx.inp_tokens, "inp_tokens", -1);
         ggml_set_input(lctx.inp_tokens);
 

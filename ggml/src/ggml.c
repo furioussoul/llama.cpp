@@ -1298,7 +1298,7 @@ bool ggml_is_transposed(const struct ggml_tensor * tensor) {
 
 static bool ggml_is_contiguous_n(const struct ggml_tensor * tensor, int n) {
     size_t next_nb = ggml_type_size(tensor->type);
-    if (tensor->ne[0] != ggml_blck_size(tensor->type) && tensor->nb[0] != next_nb) {
+    if (tensor->ne[0] != ggml_blck_size(tensor->type) && tensor->nb[0] != next_nb) { // ne[0] 什么时候 == ggml_blck_size(tensor->type)？
         return false;
     }
     next_nb *= tensor->ne[0]/ggml_blck_size(tensor->type);
