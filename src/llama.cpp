@@ -8433,25 +8433,26 @@ static int llama_prepare_sbatch(
         const llama_batch & batch,
         uint32_t          & n_outputs) {
     const auto & model   = lctx.model;
-    const auto & hparams = model.hparams;
-    const auto & cparams = lctx.cparams;
+    const auto & hparams = model.hparams; // hyper params
+    const auto & cparams = lctx.cparams; // compute params
 
-    const uint32_t n_tokens_all = batch.n_tokens;
-    const  int64_t n_embd       = hparams.n_embd;
+    const uint32_t n_tokens_all = batch.n_tokens; // 32
+    const  int64_t n_embd       = hparams.n_embd; // 3584 
 
     // this indicates we are doing pooled embedding, so we ignore batch.logits and output all tokens
     const bool embd_pooled = cparams.embeddings && cparams.pooling_type != LLAMA_POOLING_TYPE_NONE;
-
+    // 二者必须要有一
     GGML_ASSERT((!batch.token && batch.embd) || (batch.token && !batch.embd)); // NOLINT
-    if (batch.token) {
+    if (batch.token) { // 校验tokens，必须是合法的 token id
         for (uint32_t i = 0; i < n_tokens_all; ++i) {
-            if (batch.token[i] < 0 || uint32_t(batch.token[i]) >= model.vocab.n_tokens()) {
+            if (batch.token[i] < 0 || uint32_t(batch.token[i]) >= model.vocab.n_tokens()) { 
                 LLAMA_LOG_ERROR("%s: invalid token[%d] = %d\n", __func__, i, batch.token[i]);
                 return -1;
             }
         }
     }
-    GGML_ASSERT(n_tokens_all <= cparams.n_batch);
+    GGML_ASSERT(n_tokens_all <= cparams.n_batch); // prompt tokens 不能超过 n_batch， n_batch 不应该是批次数吗？
+    // 物理batch也要 >= prompt tokens
     GGML_ASSERT((cparams.causal_attn || cparams.n_ubatch >= n_tokens_all) && "non-causal attention requires n_ubatch >= n_tokens");
 
     lctx.n_queued_tokens += n_tokens_all;
@@ -8460,7 +8461,7 @@ static int llama_prepare_sbatch(
     // count outputs
     if (batch.logits && !embd_pooled) {
         for (uint32_t i = 0; i < n_tokens_all; ++i) {
-            n_outputs += batch.logits[i] != 0;
+            n_outputs += batch.logits[i] != 0; // 1
         }
     } else if (lctx.logits_all || embd_pooled) {
         n_outputs = n_tokens_all;
@@ -8547,7 +8548,7 @@ static int llama_prepare_ubatch(
             // a heuristic, to avoid attending the full cache if it is not yet utilized
             // after enough generations, the benefit from this heuristic disappears
             // if we start defragmenting the cache, the benefit from this will be more important
-            const uint32_t pad = llama_kv_cache_get_padding(cparams);
+            const uint32_t pad = llama_kv_cache_get_padding(cparams); // 32
             kv_self.n = std::min(kv_self.size, std::max(pad, GGML_PAD(llama_kv_cache_cell_max(kv_self), pad)));
             //kv_self.n = llama_kv_cache_cell_max(kv_self);
         }
@@ -8594,8 +8595,8 @@ static int llama_decode_impl(
     auto & kv_self = lctx.kv_self;
     llama_kv_slot_restorer kv_slot_restorer(kv_self);
 
-    const int64_t n_embd  = hparams.n_embd;
-    const int64_t n_vocab = vocab.n_tokens();
+    const int64_t n_embd  = hparams.n_embd; // 3584
+    const int64_t n_vocab = vocab.n_tokens(); // 152064
 
     uint32_t n_outputs = 0;
     uint32_t n_outputs_prev = 0;
@@ -8630,7 +8631,7 @@ static int llama_decode_impl(
 
         // the output is always the last tensor in the graph
         struct ggml_tensor * res  = ggml_graph_node(gf, -1);
-        struct ggml_tensor * embd = ggml_graph_node(gf, -2);
+        struct ggml_tensor * embd = nullptr; 
 
         if (lctx.n_outputs == 0) {
             // no output

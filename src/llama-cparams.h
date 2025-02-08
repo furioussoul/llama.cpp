@@ -6,8 +6,8 @@
 
 struct llama_cparams {
     uint32_t n_ctx;           // context size used during inference
-    uint32_t n_batch;
-    uint32_t n_ubatch;
+    uint32_t n_batch;         // 连续批处理（continuous batching）。
+    uint32_t n_ubatch;        // 物理上的连续批处理（continuous batching）。
     uint32_t n_seq_max;
     int      n_threads;       // number of threads to use for generation
     int      n_threads_batch; // number of threads to use for batch processing

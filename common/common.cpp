@@ -952,12 +952,12 @@ struct common_init_result common_init_from_params(common_params & params) {
         llama_model_free(model);
         return iparams;
     }
-
+    // qwen2.5 can shift
     if (params.ctx_shift && !llama_kv_cache_can_shift(lctx)) {
         LOG_WRN("%s: KV cache shifting is not supported for this model, disabling KV cache shifting\n", __func__);
         params.ctx_shift = false;
     }
-
+    // 目前没用到
     if (!params.control_vectors.empty()) {
         if (params.control_vector_layer_start <= 0) params.control_vector_layer_start = 1;
         if (params.control_vector_layer_end   <= 0) params.control_vector_layer_end   = llama_model_n_layer(model);
@@ -984,7 +984,7 @@ struct common_init_result common_init_from_params(common_params & params) {
             return iparams;
         }
     }
-
+    // 目前没用到，之前都是合并lora到一个model
     // load and optionally apply lora adapters
     for (auto & la : params.lora_adapters) {
         llama_adapter_lora_ptr lora;
@@ -999,16 +999,16 @@ struct common_init_result common_init_from_params(common_params & params) {
         la.ptr = lora.get();
         iparams.lora.emplace_back(std::move(lora)); // copy to list of loaded adapters
     }
-
+    // 没用lora为什么还set。。。
     if (!params.lora_init_without_apply) {
         common_set_adapter_lora(lctx, params.lora_adapters);
     }
-
+    // qwen2.5也不会进去
     if (params.sampling.ignore_eos && llama_vocab_eos(vocab) == LLAMA_TOKEN_NULL) {
         LOG_WRN("%s: warning: vocab does not have an EOS token, ignoring --ignore-eos\n", __func__);
         params.sampling.ignore_eos = false;
     }
-
+    // qwen2.5也不会进去
     if (params.sampling.ignore_eos) {
         for (llama_token i = 0; i < llama_vocab_n_tokens(vocab); i++) {
             if (llama_vocab_is_eog(vocab, i)) {
@@ -1018,14 +1018,14 @@ struct common_init_result common_init_from_params(common_params & params) {
         }
     }
 
-    if (params.sampling.penalty_last_n == -1) {
+    if (params.sampling.penalty_last_n == -1) {  // 64
         LOG_INF("%s: setting penalty_last_n to ctx_size = %d\n", __func__, llama_n_ctx(lctx));
         params.sampling.penalty_last_n = llama_n_ctx(lctx);
     }
 
     if (params.sampling.dry_penalty_last_n == -1) {
         LOG_INF("%s: setting dry_penalty_last_n to ctx_size = %d\n", __func__, llama_n_ctx(lctx));
-        params.sampling.dry_penalty_last_n = llama_n_ctx(lctx);
+        params.sampling.dry_penalty_last_n = llama_n_ctx(lctx); // 4096
     }
 
     if (params.warmup) {
@@ -1034,7 +1034,7 @@ struct common_init_result common_init_from_params(common_params & params) {
         std::vector<llama_token> tmp;
         llama_token bos = llama_vocab_bos(vocab);
         llama_token eos = llama_vocab_eos(vocab);
-
+        // 往tmp 塞开始和结束token
         // some models (e.g. T5) don't have a BOS token
         if (bos != LLAMA_TOKEN_NULL) {
             tmp.push_back(bos);
@@ -1045,7 +1045,7 @@ struct common_init_result common_init_from_params(common_params & params) {
         if (tmp.empty()) {
             tmp.push_back(0);
         }
-
+        // qwen2.5不会进去
         if (llama_model_has_encoder(model)) {
             llama_encode(lctx, llama_batch_get_one(tmp.data(), tmp.size()));
             llama_token decoder_start_token_id = llama_model_decoder_start_token(model);
@@ -1055,12 +1055,12 @@ struct common_init_result common_init_from_params(common_params & params) {
             tmp.clear();
             tmp.push_back(decoder_start_token_id);
         }
-        if (llama_model_has_decoder(model)) {
+        if (llama_model_has_decoder(model)) { // qwen2.5进去
             llama_decode(lctx, llama_batch_get_one(tmp.data(), std::min(tmp.size(), (size_t) params.n_batch)));
         }
-        llama_kv_cache_clear(lctx);
+        llama_kv_cache_clear(lctx); // clear kv cache
         llama_synchronize(lctx);
-        llama_perf_context_reset(lctx);
+        llama_perf_context_reset(lctx); // reset performence
     }
 
     iparams.model.reset(model);
@@ -1616,15 +1616,15 @@ void common_batch_add(
                  struct llama_batch & batch,
                         llama_token   id,
                           llama_pos   pos,
-    const std::vector<llama_seq_id> & seq_ids,
+    const std::vector<llama_seq_id> & seq_ids, // 派上用场了 slot.id
                                bool   logits) {
     GGML_ASSERT(batch.seq_id[batch.n_tokens] && "llama_batch size exceeded");
 
     batch.token   [batch.n_tokens] = id;
     batch.pos     [batch.n_tokens] = pos;
-    batch.n_seq_id[batch.n_tokens] = seq_ids.size();
+    batch.n_seq_id[batch.n_tokens] = seq_ids.size(); // 该 token（id）对应的 seq 数量
     for (size_t i = 0; i < seq_ids.size(); ++i) {
-        batch.seq_id[batch.n_tokens][i] = seq_ids[i];
+        batch.seq_id[batch.n_tokens][i] = seq_ids[i]; // 该 token（id）对应的 seq id
     }
     batch.logits  [batch.n_tokens] = logits;
 
@@ -1808,7 +1808,7 @@ std::string common_chat_apply_template(
         inputs.add_generation_prompt = add_ass;
         return common_chat_params_init(tmpl, inputs).prompt;
     }
-
+    // 先申请了41字节的prompt
     int alloc_size = 0;
     std::vector<llama_chat_message> chat;
     for (const auto & msg : msgs) {
@@ -1827,17 +1827,18 @@ std::string common_chat_apply_template(
         // this is a bit redundant (for good), since we're not sure if user validated the custom template with llama_chat_verify_template()
         throw std::runtime_error("this custom template is not supported");
     }
-
+    // 填充到模版后prompt变成了57字节，扩容string
     // if it turns out that our buffer is too small, we resize it
     if ((size_t) res > buf.size()) {
         buf.resize(res);
+        // 调了两遍 llama_chat_apply_template
         res = llama_chat_apply_template(tmpl.source().c_str(), chat.data(), chat.size(), add_ass, buf.data(), buf.size());
     }
 
     std::string formatted_chat(buf.data(), res);
     return formatted_chat;
 }
-
+// 这函数应该只会返回prompt新增的部分（因为有个substr）
 std::string common_chat_format_single(
         const common_chat_template & tmpl,
         const std::vector<common_chat_msg> & past_msg,

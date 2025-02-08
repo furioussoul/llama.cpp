@@ -43,7 +43,7 @@ struct llama_kv_cache {
     uint32_t size = 0;
     uint32_t used = 0; // used cells (i.e. at least one seq_id)
 
-    // computed before each graph build
+    // computed before each graph build，用来遍历的最大下标？不然全遍历1000个元素开销太大？
     uint32_t n = 0;
 
     ggml_type type_k = GGML_TYPE_F16;
@@ -51,8 +51,8 @@ struct llama_kv_cache {
 
     std::vector<llama_kv_cell> cells;
 
-    std::vector<struct ggml_tensor *> k_l; // per layer
-    std::vector<struct ggml_tensor *> v_l;
+    std::vector<struct ggml_tensor *> k_l; // per layer，v_l 是一个向量，存储每一层的 Value 张量指针。
+    std::vector<struct ggml_tensor *> v_l; 
 
     std::vector<ggml_context_ptr> ctxs;
     std::vector<ggml_backend_buffer_ptr> bufs;
@@ -72,7 +72,7 @@ struct llama_kv_cache {
         for (const auto & cell : cells) {
             max_pos = std::max(max_pos, cell.pos);
         }
-
+        // 第一次进来是-1， 为什么？
         return max_pos;
     }
 };

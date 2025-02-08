@@ -203,11 +203,11 @@ struct common_params_vocoder {
 struct common_params {
     int32_t n_predict             =    -1; // new tokens to predict
     int32_t n_ctx                 =  4096; // context size
-    int32_t n_batch               =  2048; // logical batch size for prompt processing (must be >=32 to use BLAS)
+    int32_t n_batch               =  2048; // logical batch size for prompt processing (must be >=32 to use BLAS)。连续批处理（Continuous Batching）是一种在推理（inference）或实时服务场景中常用的技术，旨在高效地处理多个请求或任务。这种技术通过动态地将多个输入请求组合成一个批次（batch），然后统一进行计算，从而优化硬件资源利用率和吞吐量。
     int32_t n_ubatch              =   512; // physical batch size for prompt processing (must be >=32 to use BLAS)
     int32_t n_keep                =     0; // number of tokens to keep from initial prompt
     int32_t n_chunks              =    -1; // max number of chunks to process (-1 = unlimited)
-    int32_t n_parallel            =     1; // number of parallel sequences to decode
+    int32_t n_parallel            =     2; // number of parallel sequences to decode
     int32_t n_sequences           =     1; // number of sequences to decode
     int32_t grp_attn_n            =     1; // group-attention factor
     int32_t grp_attn_w            =   512; // group-attention width

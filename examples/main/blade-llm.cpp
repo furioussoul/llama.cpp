@@ -58,17 +58,17 @@ int main(int argc, char ** argv) {
         LOG_DBG("formatted: '%s'\n", formatted.c_str());
         return formatted;
     };
-
+    // 将chat_msgs(历史消息)和新消息new_msg填充到prompt模板中
     std::string prompt = chat_add_and_format("system", params.prompt.empty() ? DEFAULT_SYSTEM_MESSAGE : params.prompt);
 
     std::vector<llama_token> embd;
     std::vector<llama_token> embd_inp;
 
-    embd_inp = common_tokenize(ctx, prompt, true, true);
+    embd_inp = common_tokenize(ctx, prompt, false, true);
 
-    std::string user_inp = chat_add_and_format("user", std::move("你好，鸡你太美～ 知道什么意思吗？"));
+    std::string user_inp = chat_add_and_format("user", std::move("你好呀，鸡你太美～ 知道什么意思吗？"));
     const auto  line_inp = common_tokenize(ctx, user_inp, false, true);
-    embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
+    embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end()); // 组成完成的prompt tokens
 
     auto sparams         = llama_sampler_chain_default_params();
     sparams.no_perf      = false;
@@ -82,8 +82,8 @@ int main(int argc, char ** argv) {
     int         n_predict = 1024;
 
     llama_batch batch    = llama_batch_get_one(embd_inp.data(), embd_inp.size());
-
-    for (int n_pos = 0; n_pos + batch.n_tokens < (int32_t)embd_inp.size() + n_predict;) {
+    // 生成不超过 n_predict - batch.n_tokens 数量的tokens
+    for (int n_pos = 0; n_pos < n_predict;) {
         // evaluate the current batch with the transformer model
         if (llama_decode(ctx, batch)) {
             fprintf(stderr, "%s : failed to eval, return code %d\n", __func__, 1);

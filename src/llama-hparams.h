@@ -102,7 +102,7 @@ struct llama_hparams {
     float f_attention_scale = 0.0f;
 
     bool causal_attn   = true;
-    bool use_alibi     = false;
+    bool use_alibi     = false; // ALiBi（Attention with Linear Biases）
     bool attn_soft_cap = false;
 
     // needed by encoder-decoder models (e.g. T5, FLAN-T5)

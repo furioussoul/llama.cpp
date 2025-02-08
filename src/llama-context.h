@@ -22,7 +22,7 @@ struct llama_context {
 
     const struct llama_model & model;
 
-    struct llama_cparams      cparams;
+    struct llama_cparams      cparams; // compute params
     struct llama_sbatch       sbatch;  // TODO: revisit if needed
     struct llama_kv_cache     kv_self;
     struct llama_adapter_cvec cvec;
@@ -97,7 +97,7 @@ struct llama_context {
     struct ggml_tensor * inp_pos;           // I32 [n_batch]
     struct ggml_tensor * inp_out_ids;       // I32 [n_outputs]
     struct ggml_tensor * inp_KQ_mask;       // F32 [kv_size, n_batch]
-    struct ggml_tensor * inp_KQ_mask_swa;   // F32 [kv_size, n_batch]
+    struct ggml_tensor * inp_KQ_mask_swa;   // F32 [kv_size, n_batch]， 滑动窗口注意力（sliding window attention）。
     struct ggml_tensor * inp_K_shift;       // I32 [kv_size]
     struct ggml_tensor * inp_mean;          // F32 [n_batch, n_batch]
     struct ggml_tensor * inp_cls;           // I32 [n_batch]

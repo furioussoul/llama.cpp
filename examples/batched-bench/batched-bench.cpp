@@ -58,12 +58,12 @@ int main(int argc, char ** argv) {
     }
 
     const int32_t n_kv_max = llama_n_ctx(ctx);
-
+    // n_kv_max 2048
     llama_batch batch = llama_batch_init(n_kv_max, 0, 1);
 
     // decode in batches of ctx_params.n_batch tokens
     auto decode_helper = [](llama_context * ctx, llama_batch & batch, int32_t n_batch) {
-        for (int32_t i = 0; i < (int32_t) batch.n_tokens; i += n_batch) {
+        for (int32_t i = 0; i < (int32_t) batch.n_tokens; i += n_batch) { // 一次移动n_batch，代表每次处理一个batch
             const int32_t n_tokens = std::min(n_batch, (int32_t) (batch.n_tokens - i));
 
             llama_batch batch_view = {
@@ -107,17 +107,17 @@ int main(int argc, char ** argv) {
         LOG("|%6s | %6s | %4s | %6s | %8s | %8s | %8s | %8s | %8s | %8s |\n", "PP", "TG", "B", "N_KV", "T_PP s", "S_PP t/s", "T_TG s", "S_TG t/s", "T s", "S t/s");
         LOG("|%6s-|-%6s-|-%4s-|-%6s-|-%8s-|-%8s-|-%8s-|-%8s-|-%8s-|-%8s-|\n", "------", "------", "----", "------", "--------", "--------", "--------", "--------", "--------", "--------");
     }
-
+    // n_pp [128, 256, 512]  n_tg [128, 256]  n_pl [1, 2, 4, 8, 16, 32]
     for (        int i_pp = 0; i_pp < (int) n_pp.size(); ++i_pp) {
         for (    int i_tg = 0; i_tg < (int) n_tg.size(); ++i_tg) {
             for (int i_pl = 0; i_pl < (int) n_pl.size(); ++i_pl) {
-                const int pp = n_pp[i_pp];
-                const int tg = n_tg[i_tg];
-                const int pl = n_pl[i_pl];
-
+                const int pp = n_pp[i_pp]; // 128，（Prompt Tokens Per Batch）
+                const int tg = n_tg[i_tg]; // 128，（Generated Tokens Per Batch）
+                const int pl = n_pl[i_pl]; // 并行度
+                // n_ctx_req = 512
                 const int n_ctx_req = is_pp_shared ? pp + pl*tg : pl*(pp + tg);
-
-                if (n_ctx_req > n_kv_max) {
+                // n_kv_max = 2048
+                if (n_ctx_req > n_kv_max) { 
                     continue;
                 }
 
@@ -128,12 +128,12 @@ int main(int argc, char ** argv) {
                         common_batch_add(batch, 0, i, { j }, false);
                     }
                 }
-                batch.logits[batch.n_tokens - 1] = true;
+                batch.logits[batch.n_tokens - 1] = true; // 最后一个token计算概率
 
                 const auto t_pp_start = ggml_time_us();
 
                 llama_kv_cache_clear(ctx);
-
+                // prefill
                 if (!decode_helper(ctx, batch, ctx_params.n_batch)) {
                     LOG_ERR("%s: llama_decode() failed\n", __func__);
                     return 1;
@@ -141,7 +141,7 @@ int main(int argc, char ** argv) {
 
                 if (is_pp_shared) {
                     for (int32_t i = 1; i < pl; ++i) {
-                        llama_kv_cache_seq_cp(ctx, 0, i, -1, -1);
+                        llama_kv_cache_seq_cp(ctx, 0, i, -1, -1); // 共用一个kv_cache，通过往kv_cache cells里面添加seq_id=i来实现
                     }
                 }
 

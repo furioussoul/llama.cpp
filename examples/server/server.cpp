@@ -1600,7 +1600,7 @@ struct server_queue {
                         return;
                     }
                     condition_tasks.wait(lock, [&]{
-                        return (!queue_tasks.empty() || !running);
+                        return (!queue_tasks.empty() || !running); // wait until new task arrives
                     });
                 }
             }
@@ -1828,7 +1828,7 @@ struct server_context {
             params_dft.model_url    = params_base.speculative.model_url;
             params_dft.n_ctx        = params_base.speculative.n_ctx == 0 ? params_base.n_ctx / params_base.n_parallel : params_base.speculative.n_ctx;
             params_dft.n_gpu_layers = params_base.speculative.n_gpu_layers;
-            params_dft.n_parallel   = 1;
+            params_dft.n_parallel   = 2;
 
             llama_init_dft = common_init_from_params(params_dft);
 
@@ -2803,8 +2803,8 @@ struct server_context {
 
                 SLT_WRN(slot, "slot context shift, n_keep = %d, n_left = %d, n_discard = %d\n", n_keep, n_left, n_discard);
 
-                llama_kv_cache_seq_rm (ctx, slot.id, n_keep            , n_keep + n_discard);
-                llama_kv_cache_seq_add(ctx, slot.id, n_keep + n_discard, slot.n_past,        -n_discard);
+                llama_kv_cache_seq_rm (ctx, slot.id, n_keep            , n_keep + n_discard); // rm [n_keep, n_keep + n_discard)
+                llama_kv_cache_seq_add(ctx, slot.id, n_keep + n_discard, slot.n_past,        -n_discard); // add [n_keep + n_discard, n_past)
 
                 if (slot.params.cache_prompt) {
                     for (size_t i = n_keep + n_discard; i < slot.cache_tokens.size(); i++) {
@@ -3064,7 +3064,7 @@ struct server_context {
                     }
 
                     SLT_INF(slot, "prompt processing progress, n_past = %d, n_tokens = %d, progress = %f\n", slot.n_past, batch.n_tokens, (float) slot.n_prompt_tokens_processed / slot.n_prompt_tokens);
-
+                    // prefill
                     // entire prompt has been processed
                     if (slot.n_past == slot.n_prompt_tokens) {
                         slot.state = SLOT_STATE_DONE_PROMPT;
@@ -4415,7 +4415,7 @@ int main(int argc, char ** argv) {
     }
 
     // run the HTTP server in a thread
-    std::thread t([&]() { svr->listen_after_bind(); });
+    std::thread t([&]() { svr->listen_after_bind(); }); // n 个线程接收请求
     svr->wait_until_ready();
 
     LOG_INF("%s: HTTP server is listening, hostname: %s, port: %d, http threads: %d\n", __func__, params.hostname.c_str(), params.port, params.n_threads_http);

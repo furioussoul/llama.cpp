@@ -300,7 +300,7 @@ llama_batch_allocr::llama_batch_allocr(struct llama_batch in_batch, llama_pos p0
     }
     if (!batch.logits) {
         logits.resize(batch.n_tokens);
-        logits[logits.size() - 1] = true;
+        logits[logits.size() - 1] = true; // 最后一个是1
         batch.logits = logits.data();
     }
 }
@@ -342,11 +342,11 @@ struct llama_batch llama_batch_init(int32_t n_tokens_alloc, int32_t embd, int32_
 
     batch.pos      = (llama_pos *)     malloc(sizeof(llama_pos)      * n_tokens_alloc);
     batch.n_seq_id = (int32_t *)       malloc(sizeof(int32_t)        * n_tokens_alloc);
-    batch.seq_id   = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (n_tokens_alloc + 1));
+    batch.seq_id   = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (n_tokens_alloc + 1)); // 动态数组末尾加上nullptr，在遍历时不需要用长度就可以判断结束
     for (int i = 0; i < n_tokens_alloc; ++i) {
         batch.seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
     }
-    batch.seq_id[n_tokens_alloc] = nullptr;
+    batch.seq_id[n_tokens_alloc] = nullptr; //  // 动态数组末尾加上nullptr，在遍历时不需要用长度就可以判断结束，所以最后一个是nullptr
 
     batch.logits   = (int8_t *)        malloc(sizeof(int8_t)         * n_tokens_alloc);
 

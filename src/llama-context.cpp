@@ -104,8 +104,8 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             } else if (ubatch.output) {
                 int32_t n_outputs = 0;
                 for (int i = 0; i < n_tokens; ++i) {
-                    if (ubatch.output[i]) {
-                        data[n_outputs++] = i;
+                    if (ubatch.output[i]) { // 最后一个是1
+                        data[n_outputs++] = i; // = n_tokens-1
                     }
                 }
                 // the graph needs to have been passed the correct number of outputs
@@ -132,7 +132,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             const int64_t n_kv         = kv_self.n;
             const int64_t n_tokens     = ubatch.n_tokens;
             const int64_t n_seq_tokens = ubatch.n_seq_tokens;
-            const int64_t n_seqs       = ubatch.n_seqs;
+            const int64_t n_seqs       = ubatch.n_seqs; // seq count not seq length
 
 
             float * data     = nullptr;
@@ -142,7 +142,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
                 GGML_ASSERT(ggml_backend_buffer_is_host(lctx.inp_KQ_mask->buffer));
                 data = (float *) lctx.inp_KQ_mask->data;
             }
-
+            // 没用滑动窗口注意力
             if (lctx.inp_KQ_mask_swa) {
                 GGML_ASSERT(ggml_backend_buffer_is_host(lctx.inp_KQ_mask_swa->buffer));
                 data_swa = (float *) lctx.inp_KQ_mask_swa->data;
@@ -152,17 +152,20 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             // of the correct sequence for each token of the ubatch.
             // It's assumed that if a token in the batch has multiple sequences, they are equivalent.
             for (int h = 0; h < 1; ++h) {
-                for (int s = 0; s < n_seqs; ++s) {
+                for (int s = 0; s < n_seqs; ++s) { // n_seqs = 并行度
                     const llama_seq_id seq_id = ubatch.seq_id[s][0];
 
                     for (int j = 0; j < n_seq_tokens; ++j) {
-                        const llama_pos pos = ubatch.pos[s*n_seq_tokens + j];
+                        const llama_pos pos = ubatch.pos[s*n_seq_tokens + j]; // ubatch.pos [0,1,2,3,4,...]
 
                         for (int i = 0; i < n_kv; ++i) {
                             float f;
+                            // kv中的token可能被多个seq共享，所以要判断是否属于当前seq
+                            // 该token是该seq_id的 && 位置在kv_cache中的token之前
                             if (!kv_self.cells[i].has_seq_id(seq_id) || kv_self.cells[i].pos > pos) {
                                 f = -INFINITY;
                             } else {
+                                // 没开 use_alibi
                                 if (hparams.use_alibi) {
                                     f = -std::abs(kv_self.cells[i].pos - pos);
                                 } else {
@@ -171,6 +174,8 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
                             }
 
                             if (data) {
+                                // n_kv 应该是pad(n_ctx, GGML_KQ_MASK_PAD)的结果，根据seq_len预计出来的长度。
+                                // data是个4维张量，h应该是头数，s是seq_id，j是seq中的token_id，i是kv_cache最后一个维度的id。
                                 data[h*(n_kv*n_tokens) + s*(n_kv*n_seq_tokens) + j*n_kv + i] = f;
                             }
 
@@ -247,7 +252,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    // 进不去
     if (cparams.embeddings && cparams.pooling_type == LLAMA_POOLING_TYPE_MEAN) {
         const int64_t n_tokens     = ubatch.n_tokens;
         const int64_t n_seq_tokens = ubatch.n_seq_tokens;
@@ -286,7 +291,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    //进不去
     if (cparams.embeddings && (
                 cparams.pooling_type == LLAMA_POOLING_TYPE_CLS ||
                 cparams.pooling_type == LLAMA_POOLING_TYPE_RANK)) {
@@ -315,7 +320,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    // 进不去
     if (cparams.embeddings && cparams.pooling_type == LLAMA_POOLING_TYPE_LAST) {
         const int64_t n_tokens     = ubatch.n_tokens;
         const int64_t n_seq_tokens = ubatch.n_seq_tokens;
@@ -352,7 +357,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    // 进不去
     if (kv_self.recurrent) {
         const int64_t n_kv = kv_self.n;
 
@@ -397,7 +402,7 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    // 进不去
     if (lctx.inp_pos_bucket) {
         const int64_t n_tokens = ubatch.n_tokens;
 
@@ -425,14 +430,14 @@ void llama_set_inputs(llama_context & lctx, const llama_ubatch & ubatch) {
             }
         }
     }
-
+    // 进不去
     if (!lctx.is_encoding && lctx.inp_embd_enc) {
         assert(lctx.inp_embd_enc->type == GGML_TYPE_F32);
         assert((size_t) ggml_nelements(lctx.inp_embd_enc) == lctx.embd_enc.size());
 
         ggml_backend_tensor_set(lctx.inp_embd_enc, lctx.embd_enc.data(), 0, ggml_nbytes(lctx.inp_embd_enc));
     }
-
+    // 进不去
     if (!lctx.is_encoding && lctx.inp_KQ_mask_cross) {
         const int64_t n_output_enc = lctx.embd_enc.size() / hparams.n_embd;
         const int64_t n_tokens = ubatch.n_tokens;

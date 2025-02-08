@@ -13,13 +13,13 @@ struct llama_ubatch {
 
     uint32_t n_tokens; // total tokens (n_seq_tokens * n_seqs)
     uint32_t n_seq_tokens; // tokens per sequence
-    uint32_t n_seqs;
+    uint32_t n_seqs; // seq count not seq length
 
     llama_token  *  token;    // [n_tokens]
-    float        *  embd;     // [n_embd, n_tokens]
+    float        *  embd;     // [n_embd, n_tokens] // 一般输入token就行了，这个就是nullptr，除非直接输入向量（什么模型，多模态么？）。
     llama_pos    *  pos;      // [n_tokens]
-    int32_t      *  n_seq_id; // [n_seqs]
-    llama_seq_id ** seq_id;   // [n_seqs]
+    int32_t      *  n_seq_id; // [n_seqs]  which is the number of sequences for each token
+    llama_seq_id ** seq_id;   // [n_seqs]  token for different sequence id, so it is a 2D array
     int8_t       *  output;   // [n_tokens]
 };
 

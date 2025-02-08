@@ -239,6 +239,7 @@ extern "C" {
     // - embd   : token embeddings (i.e. float vector of size n_embd) (used when token is NULL)
     // - pos    : the positions of the respective token in the sequence
     //            (if set to NULL, the token position will be tracked automatically by llama_decode)
+    // - n_seq_id : how many sequnces the token belongs to
     // - seq_id : the sequence to which the respective token belongs
     //            (if set to NULL, the sequence ID will be assumed to be 0)
     // - logits : if zero, the logits (and/or the embeddings) for the respective token will not be output
@@ -310,9 +311,9 @@ extern "C" {
     //       https://github.com/ggerganov/llama.cpp/pull/7544
     struct llama_context_params {
         uint32_t n_ctx;             // text context, 0 = from model
-        uint32_t n_batch;           // logical maximum batch size that can be submitted to llama_decode
+        uint32_t n_batch;           // logical maximum batch size that can be submitted to llama_decode。传统意义上，batch size 指的是一次性处理的样本数量。n_batch 的设计是为了表示一次性提交给模型处理的 token 数量。但它并不是直接等同于“样本的数量”或“序列的数量”，而是更倾向于逻辑上的“tokens per batch”。
         uint32_t n_ubatch;          // physical maximum batch size
-        uint32_t n_seq_max;         // max number of sequences (i.e. distinct states for recurrent models)
+        uint32_t n_seq_max;         // max number of sequences (i.e. distinct states for recurrent models)。batched模式中，一个prompt会生成多个序列，因此一个batch会对应多个seq，这个参数表示最多对应多少个seq。
         int32_t  n_threads;         // number of threads to use for generation
         int32_t  n_threads_batch;   // number of threads to use for batch processing
 

@@ -55,14 +55,14 @@ int main(int argc, char ** argv) {
     std::vector<llama_token> tokens_list;
     tokens_list = common_tokenize(vocab, params.prompt, true);
 
-    const int n_kv_req = tokens_list.size() + (n_predict - tokens_list.size())*n_parallel;
+    const int n_kv_req = tokens_list.size() + (n_predict - tokens_list.size())*n_parallel; // 116
 
     // initialize the context
 
     llama_context_params ctx_params = common_context_params_to_llama(params);
 
-    ctx_params.n_ctx   = n_kv_req;
-    ctx_params.n_batch = std::max(n_predict, n_parallel);
+    ctx_params.n_ctx   = n_kv_req; // 116
+    ctx_params.n_batch = std::max(n_predict, n_parallel); // 32
 
     llama_context * ctx = llama_init_from_model(model, ctx_params);
 
@@ -130,7 +130,7 @@ int main(int argc, char ** argv) {
         common_batch_add(batch, decoder_start_token_id, 0, seq_ids, false);
     }
 
-    // llama_decode will output logits only for the last token of the prompt
+    // prefill 阶段， llama_decode will output logits only for the last token of the prompt
     batch.logits[batch.n_tokens - 1] = true;
 
     if (llama_decode(ctx, batch) != 0) {
@@ -161,7 +161,7 @@ int main(int argc, char ** argv) {
     int n_decode = 0;
 
     const auto t_main_start = ggml_time_us();
-
+    // generation
     while (n_cur <= n_predict) {
         // prepare the next batch
         common_batch_clear(batch);
